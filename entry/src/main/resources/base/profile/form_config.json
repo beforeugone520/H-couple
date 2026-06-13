@@ -1,0 +1,23 @@
+{
+  "forms": [
+    {
+      "name": "memory_card",
+      "displayName": "双人时光盒",
+      "description": "显示最近回忆和纪念日",
+      "src": "./ets/widget/MemoryCardForm.ets",
+      "uiSyntax": "arkts",
+      "supportDimensions": [
+        "2*2"
+      ],
+      "defaultDimension": "2*2",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDefault": true,
+      "updateEnabled": true,
+      "scheduledUpdateTime": "10:30"
+    }
+  ]
+}
