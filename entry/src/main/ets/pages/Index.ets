@@ -12,7 +12,7 @@ import { MemoryTheme } from '../shared/theme/MemoryTheme';
 @Component
 struct Index {
   @State appState: AppState = new AppState();
-  @State tabIndex: number = 0;
+  @State activeTab: number = 0;
 
   aboutToAppear(): void {
     this.appState.init(getContext(this) as common.Context);
@@ -107,7 +107,7 @@ struct Index {
       } else {
         this.topBar();
 
-        Tabs({ barPosition: BarPosition.End, index: this.tabIndex }) {
+        Tabs({ barPosition: BarPosition.End, index: this.activeTab }) {
           TabContent() {
             TodayPage({ appState: this.appState });
           }.tabBar('今天');
@@ -127,7 +127,7 @@ struct Index {
         .layoutWeight(1)
         .barMode(BarMode.Fixed)
         .onChange((index: number) => {
-          this.tabIndex = index;
+          this.activeTab = index;
         });
       }
     }
