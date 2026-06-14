@@ -64,4 +64,23 @@ describe('WorkspaceHeader', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith('LOVE42'));
     expect(screen.getByText('复制失败，请手动复制 LOVE42').className).toContain('workspace-copy-status-error');
   });
+
+  it('reveals a scannable invite QR code on demand', () => {
+    const { container } = render(<WorkspaceHeader inviteCode="LOVE42" />);
+
+    // 默认折叠，保持头部紧凑
+    expect(container.querySelector('svg.invite-qr')).toBeNull();
+    const toggle = screen.getByRole('button', { name: '显示二维码' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(toggle);
+
+    expect(container.querySelector('svg.invite-qr')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '收起二维码' }).getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('does not offer a QR code when there is no invite code', () => {
+    render(<WorkspaceHeader />);
+    expect(screen.queryByRole('button', { name: '显示二维码' })).toBeNull();
+  });
 });

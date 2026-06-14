@@ -48,13 +48,13 @@ export struct AlbumPage {
   }
 
   private photoMoments(): MomentModel[] {
-    return this.appState.visibleMoments().filter((moment: MomentModel) => moment.mediaUrls.length > 0);
+    return this.appState.visibleMoments().filter((moment: MomentModel) => this.appState.photoCount(moment) > 0);
   }
 
   private totalPhotos(): number {
     let total: number = 0;
     this.appState.visibleMoments().forEach((moment: MomentModel) => {
-      total += moment.mediaUrls.length;
+      total += this.appState.photoCount(moment);
     });
     return total;
   }
@@ -113,11 +113,11 @@ export struct AlbumPage {
         if (this.photoMoments().length > 0) {
           Flex({ wrap: FlexWrap.Wrap }) {
             ForEach(this.photoMoments(), (moment: MomentModel) => {
-              Image(moment.mediaUrls[0])
+              Image(this.appState.photoPathFor(this.appState.displayPhotoPaths(moment)[0]))
                 .width(104)
                 .height(104)
                 .objectFit(ImageFit.Cover)
-                .borderRadius(MemoryTheme.radius.card)
+                .borderRadius(MemoryTheme.radius.photo)
                 .backgroundColor(MemoryTheme.skeleton.base)
                 .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm });
             }, (moment: MomentModel) => moment.id);

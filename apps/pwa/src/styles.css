@@ -2011,3 +2011,53 @@ textarea {
   margin: 0;
   color: #776a5f;
 }
+
+/* Deep-link join hint + invite QR code */
+.join-deeplink-hint {
+  margin: 8px 0 -2px;
+  padding: 9px 11px;
+  border: 1px solid rgb(95 115 81 / 22%);
+  border-radius: 8px;
+  color: var(--status-success-ink);
+  background:
+    linear-gradient(135deg, rgb(95 115 81 / 10%), transparent 68%),
+    var(--status-success-bg);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.workspace-qr {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgb(180 35 95 / 16%);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.invite-qr {
+  width: min(184px, 56vw);
+  height: auto;
+  border-radius: 8px;
+  /* 二维码必须白底黑点保证相机识别，不随深色模式反转 */
+  background: #ffffff;
+}
+
+.workspace-qr-hint {
+  max-width: 200px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.invite-qr-fallback {
+  margin: 0;
+  color: var(--status-error-ink);
+  font-size: 13px;
+  font-weight: 750;
+}

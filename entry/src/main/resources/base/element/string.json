@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "双人时光盒"
+    },
+    {
+      "name": "reminder_reason",
+      "value": "用于在纪念日当天提醒你们"
     }
   ]
 }

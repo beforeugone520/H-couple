@@ -1,4 +1,6 @@
 import { common } from '@kit.AbilityKit';
+import { connection } from '@kit.NetworkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { AlbumPage } from '../features/album/AlbumPage';
 import { TodayPage } from '../features/today/TodayPage';
 import { TimelinePage } from '../features/timeline/TimelinePage';
@@ -13,9 +15,35 @@ import { MemoryTheme } from '../shared/theme/MemoryTheme';
 struct Index {
   @State appState: AppState = new AppState();
   @State activeTab: number = 0;
+  private netConn: connection.NetConnection | null = null;
 
   aboutToAppear(): void {
     this.appState.init(getContext(this) as common.Context);
+    this.startSyncWatcher();
+  }
+
+  aboutToDisappear(): void {
+    if (this.netConn !== null) {
+      this.netConn.unregister((err: BusinessError) => {});
+      this.netConn = null;
+    }
+  }
+
+  /** 云同步开启时：启动补偿一次，并监听联网恢复后自动补传待上传瞬间。 */
+  private startSyncWatcher(): void {
+    if (!this.appState.cloud.enabled) {
+      return;
+    }
+    this.appState.syncPending();
+    try {
+      this.netConn = connection.createNetConnection();
+      this.netConn.register((err: BusinessError) => {});
+      this.netConn.on('netAvailable', (netHandle: connection.NetHandle) => {
+        this.appState.syncPending();
+      });
+    } catch (err) {
+      this.netConn = null;
+    }
   }
 
   @Builder

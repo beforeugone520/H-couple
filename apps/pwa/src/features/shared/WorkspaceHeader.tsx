@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InviteQr } from './InviteQr';
 
 const workspaceStatuses = ['已连接', '私密空间', '时间线同步'];
 
@@ -11,6 +12,7 @@ type CopyStatusTone = 'neutral' | 'success' | 'error';
 export function WorkspaceHeader({ inviteCode = '' }: WorkspaceHeaderProps) {
   const [copyStatus, setCopyStatus] = useState('');
   const [copyStatusTone, setCopyStatusTone] = useState<CopyStatusTone>('neutral');
+  const [showQr, setShowQr] = useState(false);
 
   async function copyInviteCode() {
     if (!inviteCode) {
@@ -49,10 +51,24 @@ export function WorkspaceHeader({ inviteCode = '' }: WorkspaceHeaderProps) {
               >
                 复制邀请码
               </button>
+              <button
+                aria-expanded={showQr}
+                className="workspace-copy-button"
+                onClick={() => setShowQr((value) => !value)}
+                type="button"
+              >
+                {showQr ? '收起二维码' : '显示二维码'}
+              </button>
               <span aria-live="polite" className={`workspace-copy-status workspace-copy-status-${copyStatusTone}`}>
                 {copyStatus}
               </span>
             </div>
+            {showQr && (
+              <div className="workspace-qr">
+                <InviteQr code={inviteCode} />
+                <span className="workspace-qr-hint">让对方用相机扫码，通过链接直接加入。</span>
+              </div>
+            )}
           </div>
         )}
         <div className="workspace-status" aria-label="工作区状态">
