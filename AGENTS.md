@@ -40,6 +40,10 @@ pnpm build
 
 - 保持 ArkTS/ArkUI Stage model 结构，不要把 HarmonyOS 端迁移到 WebView 或跨端壳。
 - 新增页面优先复用 `MemoryTheme`，避免在组件里散落新的颜色、字号和半径。`MemoryTheme` 的现有 token 取值被 `entry/src/ohosTest/ets/test/VisualTheme.test.ets` 断言锁定，只能新增、不要改值。
+- **ArkUI 编译红线（hvigor 已踩过的坑）**：
+  - 组件的 `@State`/成员变量名**不能与 ArkUI 通用属性方法同名**（如 `tabIndex`、`width`、`height`、`position`、`id`、`key`、`enabled`、`zIndex`、`opacity`、`scale` 等），否则报 `Property ... not assignable to base type 'CustomComponent'`。本项目曾用 `tabIndex` 触发此错，已改名 `activeTab`。
+  - `build()` 与 `@Builder` 内**只能是 UI 描述**：根容器前/之间不得写 `const/let` 等局部语句（否则报 `build method can have only one root node` 并连带 Rollup `Unexpected token`）。需要派生数据就放进普通方法或直接内联调用。
+  - 组件级条件渲染只用 `if/else`，不要用返回组件的三元；`ForEach` 必须带第三个 key 生成器参数。
 - **本地优先架构**：状态中枢是 `shared/state/AppState.ets`（`@Observed`），页面经 `@ObjectLink` 共享同一份实例。`@ObjectLink` 只观察一层属性，**所有变更必须整体替换数组/对象属性**（如 `this.moments = [...]`、克隆后 `this.space = ...`）才能触发刷新；克隆用 `shared/models/MemorySerde.ets` 的 `cloneX`。
 - **持久化**：`shared/services/MemoryRepository.ets` 把整份快照 JSON 存入 `Preferences`（name `memorybox_state`，key `snapshot`）。`AppState` 每次变更后自动写入。新增可序列化字段时，必须同时在 `MemorySerde` 的 `*FromRecord` 映射里读取（ArkTS 名义类型：`JSON.parse` 的普通对象不能直接当 class 用）。
 - **照片**：`shared/services/MemoryPhoto.ets` 用 `PhotoViewPicker` 选图并复制进沙箱 `filesDir/moments/`，存沙箱绝对路径；`Image()` 直接用该绝对路径，**不要加 `file://` 前缀**。
