@@ -24,7 +24,7 @@ export struct TodayPage {
                 .fontSize(MemoryTheme.font.subtitle)
                 .fontColor(MemoryTheme.colors.ink);
               Text(`${this.appState.togetherDays()}`)
-                .fontSize(MemoryTheme.font.hero)
+                .fontSize(MemoryTheme.font.poster)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(MemoryTheme.colors.primary);
               Text('天')
@@ -43,10 +43,18 @@ export struct TodayPage {
         }
         .alignItems(HorizontalAlign.Start)
         .width('100%')
-        .padding(MemoryTheme.space.lg)
-        .backgroundColor(MemoryTheme.colors.surface)
-        .border({ width: 1, color: MemoryTheme.colors.line })
-        .borderRadius(MemoryTheme.radius.card);
+        .padding(MemoryTheme.space.xl)
+        .linearGradient({
+          angle: 135,
+          colors: [[MemoryTheme.gradient.heroFrom, 0.0], [MemoryTheme.gradient.heroTo, 1.0]]
+        })
+        .borderRadius(MemoryTheme.radius.photo)
+        .shadow({
+          radius: MemoryTheme.elevation.heroRadius,
+          color: MemoryTheme.elevation.heroColor,
+          offsetX: 0,
+          offsetY: MemoryTheme.elevation.heroOffsetY
+        });
 
         // 最近一条
         Column({ space: MemoryTheme.space.sm }) {
@@ -163,8 +171,8 @@ export struct TodayPage {
           .border({ width: 1, color: MemoryTheme.colors.line })
           .borderRadius(MemoryTheme.radius.pill);
 
-        if (moment.mediaUrls.length > 0) {
-          Text(`${moment.mediaUrls.length} 张照片`)
+        if (this.appState.photoCount(moment) > 0) {
+          Text(`${this.appState.photoCount(moment)} 张照片`)
             .fontSize(MemoryTheme.font.caption)
             .fontWeight(FontWeight.Bold)
             .fontColor(MemoryTheme.colors.primaryDark)
@@ -174,12 +182,12 @@ export struct TodayPage {
         }
       }
 
-      if (moment.mediaUrls.length > 0) {
-        Image(moment.mediaUrls[0])
+      if (this.appState.photoCount(moment) > 0) {
+        Image(this.appState.photoPathFor(this.appState.displayPhotoPaths(moment)[0]))
           .width('100%')
-          .height(180)
+          .height(200)
           .objectFit(ImageFit.Cover)
-          .borderRadius(MemoryTheme.radius.card)
+          .borderRadius(MemoryTheme.radius.photo)
           .backgroundColor(MemoryTheme.skeleton.base);
       }
     }

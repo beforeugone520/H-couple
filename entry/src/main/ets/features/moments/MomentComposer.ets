@@ -3,7 +3,7 @@ import { promptAction } from '@kit.ArkUI';
 import { Mood } from '../../shared/models/MemoryModels';
 import { AppState } from '../../shared/state/AppState';
 import { MemoryTheme } from '../../shared/theme/MemoryTheme';
-import { deleteSandboxFile, pickImagesToSandbox } from '../../shared/services/MemoryPhoto';
+import { capturePhotoToSandbox, deleteSandboxFile, pickImagesToSandbox } from '../../shared/services/MemoryPhoto';
 
 const MAX_PHOTOS: number = 9;
 
@@ -13,15 +13,15 @@ export struct MomentComposer {
   @State text: string = '';
   @State mood: Mood = 'calm';
   @State locationName: string = '';
-  @State mediaUrls: string[] = [];
+  @State localPhotoPaths: string[] = [];
   @State picking: boolean = false;
 
   private canSave(): boolean {
-    return this.text.trim().length > 0 || this.mediaUrls.length > 0;
+    return this.text.trim().length > 0 || this.localPhotoPaths.length > 0;
   }
 
   private async pickPhotos(): Promise<void> {
-    const remaining: number = MAX_PHOTOS - this.mediaUrls.length;
+    const remaining: number = MAX_PHOTOS - this.localPhotoPaths.length;
     if (remaining <= 0) {
       promptAction.showToast({ message: `最多 ${MAX_PHOTOS} 张照片` });
       return;
@@ -31,7 +31,25 @@ export struct MomentComposer {
       const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
       const picked: string[] = await pickImagesToSandbox(context, remaining);
       if (picked.length > 0) {
-        this.mediaUrls = [...this.mediaUrls, ...picked];
+        this.localPhotoPaths = [...this.localPhotoPaths, ...picked];
+      }
+    } finally {
+      this.picking = false;
+    }
+  }
+
+  private async capturePhoto(): Promise<void> {
+    const remaining: number = MAX_PHOTOS - this.localPhotoPaths.length;
+    if (remaining <= 0) {
+      promptAction.showToast({ message: `最多 ${MAX_PHOTOS} 张照片` });
+      return;
+    }
+    this.picking = true;
+    try {
+      const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const path: string = await capturePhotoToSandbox(context);
+      if (path.length > 0) {
+        this.localPhotoPaths = [...this.localPhotoPaths, path];
       }
     } finally {
       this.picking = false;
@@ -40,19 +58,24 @@ export struct MomentComposer {
 
   private removePhoto(path: string): void {
     deleteSandboxFile(path);
-    this.mediaUrls = this.mediaUrls.filter((item: string) => item !== path);
+    this.localPhotoPaths = this.localPhotoPaths.filter((item: string) => item !== path);
   }
 
   private save(): void {
     if (!this.canSave()) {
       return;
     }
-    this.appState.addMoment(this.text, this.mood, this.locationName, this.mediaUrls);
+    this.appState.addMoment(this.text, this.mood, this.locationName, this.localPhotoPaths);
     this.text = '';
     this.mood = 'calm';
     this.locationName = '';
-    this.mediaUrls = [];
-    promptAction.showToast({ message: '已收进时光盒' });
+    this.localPhotoPaths = [];
+    if (this.appState.cloud.enabled) {
+      this.appState.syncPending();
+      promptAction.showToast({ message: '已收进时光盒，正在同步' });
+    } else {
+      promptAction.showToast({ message: '已收进时光盒' });
+    }
   }
 
   @Builder
@@ -92,7 +115,7 @@ export struct MomentComposer {
         .fontColor(MemoryTheme.colors.ink);
 
       Flex({ wrap: FlexWrap.Wrap }) {
-        ForEach(this.mediaUrls, (path: string) => {
+        ForEach(this.localPhotoPaths, (path: string) => {
           Stack({ alignContent: Alignment.TopEnd }) {
             Image(path)
               .width(80)
@@ -117,9 +140,9 @@ export struct MomentComposer {
           .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm });
         }, (path: string) => path);
 
-        if (this.mediaUrls.length < MAX_PHOTOS) {
+        if (this.localPhotoPaths.length < MAX_PHOTOS) {
           Column() {
-            Text(this.picking ? '选择中' : '+ 添加')
+            Text(this.picking ? '处理中' : '拍照')
               .fontSize(MemoryTheme.font.meta)
               .fontWeight(FontWeight.Bold)
               .fontColor(MemoryTheme.colors.primaryDark);
@@ -130,6 +153,26 @@ export struct MomentComposer {
           .backgroundColor(MemoryTheme.colors.surfaceStrong)
           .border({ width: 1, color: MemoryTheme.colors.line })
           .borderRadius(MemoryTheme.radius.card)
+          .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm })
+          .onClick(() => {
+            this.capturePhoto();
+          });
+        }
+
+        if (this.localPhotoPaths.length < MAX_PHOTOS) {
+          Column() {
+            Text(this.picking ? '选择中' : '+ 相册')
+              .fontSize(MemoryTheme.font.meta)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(MemoryTheme.colors.primaryDark);
+          }
+          .justifyContent(FlexAlign.Center)
+          .width(80)
+          .height(80)
+          .backgroundColor(MemoryTheme.colors.surfaceStrong)
+          .border({ width: 1, color: MemoryTheme.colors.line })
+          .borderRadius(MemoryTheme.radius.card)
+          .margin({ bottom: MemoryTheme.space.sm })
           .onClick(() => {
             this.pickPhotos();
           });

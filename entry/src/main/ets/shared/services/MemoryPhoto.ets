@@ -1,5 +1,6 @@
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
-import { fileIo } from '@kit.CoreFileKit';
+import { cameraPicker, camera } from '@kit.CameraKit';
+import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { generateId } from '../util/MemoryUtil';
 
@@ -38,6 +39,51 @@ export function deleteSandboxFile(path: string): void {
   } catch (err) {
     // 文件可能已被移除，忽略。
   }
+}
+
+function fileSize(path: string): number {
+  try {
+    return fileIo.statSync(path).size;
+  } catch (err) {
+    return 0;
+  }
+}
+
+/**
+ * 用系统相机拍一张照片并落地沙箱，返回沙箱绝对路径（不加 file:// 前缀）。
+ * cameraPicker.pick 是免权限系统选择器（无需 ohos.permission.CAMERA）。
+ * 优先用 saveUri 让系统直接写入沙箱目标（部分机型要求该文件预先存在，故先建空占位）；
+ * 若 saveUri 未被写入则用返回的 resultUri 兜底复制。用户取消/无相机返回空串。
+ */
+export async function capturePhotoToSandbox(context: common.UIAbilityContext): Promise<string> {
+  const dir: string = `${context.filesDir}/${MEDIA_DIR_NAME}`;
+  ensureDir(dir);
+  const destPath: string = `${dir}/${generateId()}.jpg`;
+  try {
+    const placeholder: fileIo.File = fileIo.openSync(destPath, fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE);
+    fileIo.closeSync(placeholder);
+    const saveUri: string = fileUri.getUriFromPath(destPath);
+    const profile: cameraPicker.PickerProfile = {
+      cameraPosition: camera.CameraPosition.CAMERA_POSITION_BACK,
+      saveUri: saveUri
+    };
+    const result: cameraPicker.PickerResult =
+      await cameraPicker.pick(context, [cameraPicker.PickerMediaType.PHOTO], profile);
+    if (result.resultCode === 0) {
+      if (fileSize(destPath) > 0) {
+        return destPath;
+      }
+      if (result.resultUri.length > 0) {
+        const copied: string = await copyUriToSandbox(context, result.resultUri);
+        deleteSandboxFile(destPath);
+        return copied;
+      }
+    }
+  } catch (err) {
+    // 用户取消或设备无相机，回退为”未拍照”。
+  }
+  deleteSandboxFile(destPath);
+  return '';
 }
 
 async function copyUriToSandbox(context: common.UIAbilityContext, uri: string): Promise<string> {

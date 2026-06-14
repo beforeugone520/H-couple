@@ -51,10 +51,17 @@ export class MemoryApi {
     return session;
   }
 
-  /** 拉取某双人空间的全部瞬间（按发生日期倒序）。 */
-  async listMoments(coupleSpaceId: string): Promise<MomentModel[]> {
-    const url: string =
-      `${this.config.supabaseUrl}/rest/v1/moments?couple_space_id=eq.${coupleSpaceId}&select=*&order=occurred_at.desc`;
+  /**
+   * 拉取某双人空间的瞬间（按更新时间倒序）。
+   * sinceIso 为空=全量；非空=增量，只拉 updated_at 大于该时刻的行（配合 schema 的 (couple_space_id, updated_at desc) 索引）。
+   */
+  async listMoments(coupleSpaceId: string, sinceIso: string = ''): Promise<MomentModel[]> {
+    let url: string =
+      `${this.config.supabaseUrl}/rest/v1/moments?couple_space_id=eq.${coupleSpaceId}&select=*&order=updated_at.desc`;
+    if (sinceIso.trim().length > 0) {
+      // gte + 按 id 去重：水位是“上次拉到的最大 updated_at”，gte 会重复带出水位行但 mergePulledMoments 去重，规避同毫秒边界漏行。
+      url += `&updated_at=gte.${encodeURIComponent(sinceIso.trim())}`;
+    }
     const response: http.HttpResponse = await this.send('GET', url, '', true);
     if (response.responseCode < 200 || response.responseCode >= 300) {
       throw new Error(`拉取失败：HTTP ${response.responseCode}`);
@@ -106,7 +113,10 @@ export class MemoryApi {
         ? this.config.accessToken
         : this.config.anonKey;
       header['Authorization'] = `Bearer ${bearer}`;
-      header['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+      // 只有写操作（upsert）需要 merge-duplicates / return=minimal；GET 带 return=minimal 会返回空 body 导致 JSON.parse 失败。
+      if (method !== 'GET') {
+        header['Prefer'] = 'resolution=merge-duplicates,return=minimal';
+      }
 
       const options: http.HttpRequestOptions = {
         method: method === 'GET' ? http.RequestMethod.GET : http.RequestMethod.POST,

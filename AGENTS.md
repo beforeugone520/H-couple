@@ -50,6 +50,13 @@ pnpm build
 - `entry/src/main/module.json5` 中的 `ohos.permission.INTERNET` 是 Supabase 网络访问所需权限，不要删除。相册选图与沙箱读写走 picker 临时授权，无需额外权限。
 - 桌面卡片：数据提供方是 `entry/src/main/ets/widget/MemoryCardFormProvider.ets`（`FormExtensionAbility`，读同一份 `Preferences` 快照），卡片 UI 是 `entry/src/main/ets/widget/MemoryCardForm.ets`（`@LocalStorageProp` 绑定，key 必须与 provider 的 `createFormBindingData` 字段一致）。module.json5 的 `extensionAbilities[].srcEntry` 指向 provider，form_config.json 的 `src` 指向卡片 UI。
 - `MemoryApiConfig` 中的 Supabase URL、anon key、access token 只能从运行时配置或安全存储注入，不能硬编码真实值。云同步是可选增强，纯本地模式必须始终可用。
+- **照片跨端**：`MomentModel.mediaUrls` 与 PWA 统一，只存 Supabase Storage 对象 path（`{coupleSpaceId}/{userId}/{uuid}.{ext}`），**不再存本地绝对路径**。HOS 端尚未上传的照片放 `MomentModel.localMediaPaths`（沙箱绝对路径）。`shared/services/MemoryStorage.ets` 封装 Storage REST 上传/签名/下载，`shared/services/MediaResolver.ets` 把 storage path 解析成 `filesDir/moments_cache/` 缓存绝对路径。所有页面渲染照片统一走 `AppState.photoPathFor(path)`：本地路径直显，storage path 命中缓存返回、未命中触发异步下载（`requestMediaResolve` 去重）；不要再直接 `Image(moment.mediaUrls[0])`。
+- **离线上传队列**：`MomentModel.syncState`（`local|pending|synced|failed`）与 `lastSyncError` 是 HOS 本地专属字段，**绝不进云端 `moments` 表**——`MemoryApi.toRow` 不得写这些字段（写了 PostgREST 会 400）。`AppState.syncPending()` 是统一队列：先把 `localMediaPaths` 逐张上传得到 storage path 填入 `media_urls`、清空 `localMediaPaths`，再 `pushMoment`，成功 `synced`、失败 `failed` 可重试；`syncing` 闸门防重入。触发点：`MomentComposer` 保存后、`Index` 的 NetworkKit `netAvailable` 监听、`TimelinePage` 的“重试”、`UsPage.cloudPush`（`markAllUnsyncedPending` 后）。
+- **通知提醒**：`shared/services/AnniversaryReminderService.ets` 用 `reminderAgentManager` 发布纪念日日历提醒（`yearly` 走 `repeatMonths/repeatDays`）；`AnniversaryModel.reminderId` 本地保存系统 id 用于 `cancelReminder`；增/删/改/重置纪念日时同步增删提醒。`module.json5` 的 `ohos.permission.PUBLISH_AGENT_REMINDER`（system_grant，免运行时弹窗）不要删除。
+- **相机拍照**：`MemoryPhoto.capturePhotoToSandbox` 用免权限 `cameraPicker.pick` 拍照落沙箱，与 `pickImagesToSandbox`（相册）并存；二者产物都是沙箱绝对路径，进 `localMediaPaths`。
+- **云同步增量**：`MemoryApi.listMoments(coupleSpaceId, sinceIso)` 传非空 `sinceIso` 时按 `updated_at=gt.` 增量拉取；`UsPage.cloudPull` 必须在 `markSynced()` 之前读取 `cloud.lastSyncAt` 作为 since。
+- 新增可序列化字段（如上述 `localMediaPaths/syncState/lastSyncError/reminderId`）必须同步在 `MemorySerde` 的 `*FromRecord` 显式读取，否则 `Preferences` 快照往返会丢字段。
+- `MemoryTheme` 新增的 `elevation/motion/gradient/font.poster/radius.photo` 等 token 与现有 token 一样：只能新增、不能改现值（`VisualTheme.test.ets` 锁定）。
 
 ## PWA Guidelines
 

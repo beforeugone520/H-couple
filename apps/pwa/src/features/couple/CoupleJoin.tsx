@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { StatusMessage, type StatusTone } from '../shared/StatusMessage';
+import { normalizeInviteCode } from './inviteLink';
 
 type CoupleJoinProps = {
   onJoined: (coupleSpaceId: string, inviteCode?: string) => void;
+  detectedInviteCode?: string;
 };
 
 type CreatedSpace = {
@@ -13,12 +15,9 @@ type CreatedSpace = {
 
 type PendingAction = 'create' | 'join' | null;
 
-function normalizeInviteCode(value: string) {
-  return value.replace(/\s+/g, '').toUpperCase();
-}
-
-export function CoupleJoin({ onJoined }: CoupleJoinProps) {
-  const [inviteCode, setInviteCode] = useState('');
+export function CoupleJoin({ onJoined, detectedInviteCode = '' }: CoupleJoinProps) {
+  const [inviteCode, setInviteCode] = useState(detectedInviteCode);
+  const fromDeepLink = detectedInviteCode.trim().length > 0;
   const [status, setStatus] = useState('');
   const [statusTone, setStatusTone] = useState<StatusTone>('neutral');
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
@@ -106,6 +105,11 @@ export function CoupleJoin({ onJoined }: CoupleJoinProps) {
         {isCreating ? '创建中...' : '创建双人空间'}
       </button>
       <p className="join-divider">已有邀请码</p>
+      {fromDeepLink && (
+        <p aria-live="polite" className="join-deeplink-hint">
+          已从邀请链接识别邀请码，确认后即可加入。
+        </p>
+      )}
       <div className="join-row">
         <label className="field">
           <span>邀请码</span>

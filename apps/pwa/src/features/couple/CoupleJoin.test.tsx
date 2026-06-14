@@ -113,4 +113,21 @@ describe('CoupleJoin', () => {
     expect(screen.getByText('3. 对方加入')).toBeTruthy();
     expect(screen.getByText('已有邀请码')).toBeTruthy();
   });
+
+  it('prefills and announces an invite code detected from a deep link', () => {
+    render(<CoupleJoin onJoined={vi.fn()} detectedInviteCode="LOVE42" />);
+
+    const inviteInput = screen.getByLabelText('邀请码') as HTMLInputElement;
+    expect(inviteInput.value).toBe('LOVE42');
+    expect(screen.getByText('已从邀请链接识别邀请码，确认后即可加入。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '加入' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('keeps the invite field empty when no deep link code is provided', () => {
+    render(<CoupleJoin onJoined={vi.fn()} />);
+
+    const inviteInput = screen.getByLabelText('邀请码') as HTMLInputElement;
+    expect(inviteInput.value).toBe('');
+    expect(screen.queryByText('已从邀请链接识别邀请码，确认后即可加入。')).toBeNull();
+  });
 });

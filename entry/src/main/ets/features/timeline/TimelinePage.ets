@@ -30,6 +30,11 @@ export struct TimelinePage {
     this.partnerDraft = '';
   }
 
+  private retrySync(moment: MomentModel): void {
+    this.appState.markMomentSync(moment.id, 'pending', '');
+    this.appState.syncPending();
+  }
+
   @Builder
   filterChip(value: TimelineFilter, label: string) {
     Text(label)
@@ -90,19 +95,19 @@ export struct TimelinePage {
       }
       .width('100%');
 
-      if (moment.mediaUrls.length > 0) {
+      if (this.appState.photoCount(moment) > 0) {
         Row({ space: MemoryTheme.space.sm }) {
-          ForEach(moment.mediaUrls.slice(0, 3), (path: string) => {
-            Image(path)
+          ForEach(this.appState.displayPhotoPaths(moment).slice(0, 3), (path: string) => {
+            Image(this.appState.photoPathFor(path))
               .width(96)
               .height(96)
               .objectFit(ImageFit.Cover)
-              .borderRadius(MemoryTheme.radius.card)
+              .borderRadius(MemoryTheme.radius.photo)
               .backgroundColor(MemoryTheme.skeleton.base);
           }, (path: string) => path);
 
-          if (moment.mediaUrls.length > 3) {
-            Text(`+${moment.mediaUrls.length - 3}`)
+          if (this.appState.photoCount(moment) > 3) {
+            Text(`+${this.appState.photoCount(moment) - 3}`)
               .fontSize(MemoryTheme.font.body)
               .fontWeight(FontWeight.Bold)
               .fontColor(MemoryTheme.colors.muted)
@@ -209,6 +214,38 @@ export struct TimelinePage {
               this.beginPartnerEdit(moment);
             });
         }
+      }
+
+      // 同步状态（仅云同步待上传/失败时提示）
+      if (moment.syncState === 'pending') {
+        Text('待上传')
+          .fontSize(MemoryTheme.font.caption)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(MemoryTheme.status.pendingInk)
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .backgroundColor(MemoryTheme.status.pendingBg)
+          .borderRadius(MemoryTheme.radius.pill);
+      } else if (moment.syncState === 'failed') {
+        Row({ space: MemoryTheme.space.sm }) {
+          Text('上传失败')
+            .fontSize(MemoryTheme.font.caption)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(MemoryTheme.status.errorInk)
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .backgroundColor(MemoryTheme.status.errorBg)
+            .borderRadius(MemoryTheme.radius.pill);
+          Text('重试')
+            .fontSize(MemoryTheme.font.caption)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(MemoryTheme.colors.surfaceStrong)
+            .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+            .backgroundColor(MemoryTheme.colors.primary)
+            .borderRadius(MemoryTheme.radius.pill)
+            .onClick(() => {
+              this.retrySync(moment);
+            });
+        }
+        .width('100%');
       }
 
       // 轻回应

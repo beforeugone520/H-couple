@@ -5,6 +5,7 @@ import {
   MemberRole,
   MomentModel,
   MomentResponse,
+  MomentSyncState,
   Mood,
   RepeatType,
   SpaceModel,
@@ -46,6 +47,10 @@ function toResponse(value: string): MomentResponse {
   return value === 'like' || value === 'hug' || value === 'miss_you' ? value as MomentResponse : '';
 }
 
+function toSyncState(value: string): MomentSyncState {
+  return value === 'pending' || value === 'synced' || value === 'failed' ? value as MomentSyncState : 'local';
+}
+
 function toRepeatType(value: string): RepeatType {
   return value === 'none' || value === 'yearly' ? value as RepeatType : 'yearly';
 }
@@ -79,6 +84,10 @@ export function momentFromRecord(row: Record<string, Object>): MomentModel {
   moment.updatedAt = readString(row, 'updated_at', readString(row, 'updatedAt'));
   moment.isFavorite = readBoolean(row, 'is_favorite', readBoolean(row, 'isFavorite'));
   moment.deletedForUserIds = pickStringArray(row, 'deleted_for_user_ids', 'deletedForUserIds');
+  // 本地专属字段：云端 row 不含这些 key 时自然回退默认（云端拉取项的 syncState 由 mergePulledMoments 置 synced）。
+  moment.localMediaPaths = pickStringArray(row, 'local_media_paths', 'localMediaPaths');
+  moment.syncState = toSyncState(readString(row, 'syncState', 'local'));
+  moment.lastSyncError = readString(row, 'lastSyncError');
   return moment;
 }
 
@@ -92,6 +101,8 @@ export function anniversaryFromRecord(row: Record<string, Object>): AnniversaryM
   anniversary.reminderEnabled = readBoolean(row, 'reminder_enabled', readBoolean(row, 'reminderEnabled', true));
   anniversary.coverMediaUrl = readString(row, 'cover_media_url', readString(row, 'coverMediaUrl'));
   anniversary.createdAt = readString(row, 'created_at', readString(row, 'createdAt'));
+  // 本地专属：系统提醒 id（云端不含此列）。
+  anniversary.reminderId = readNumber(row, 'reminderId', -1);
   return anniversary;
 }
 

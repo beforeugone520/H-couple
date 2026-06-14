@@ -1,6 +1,6 @@
 import { pasteboard } from '@kit.BasicServicesKit';
 import { promptAction } from '@kit.ArkUI';
-import { AnniversaryModel, MemberModel, RepeatType } from '../../shared/models/MemoryModels';
+import { AnniversaryModel, MemberModel, MomentModel, RepeatType } from '../../shared/models/MemoryModels';
 import { AppState } from '../../shared/state/AppState';
 import { MemoryApi, MemoryApiConfig, CloudSession } from '../../shared/services/MemoryApi';
 import { MemoryTheme } from '../../shared/theme/MemoryTheme';
@@ -15,6 +15,8 @@ export struct UsPage {
   @State annTitle: string = '';
   @State annDate: string = '';
   @State annRepeat: RepeatType = 'yearly';
+  @State annReminder: boolean = true;
+  @State editingAnnId: string = '';
   @State cloudUrl: string = '';
   @State cloudKey: string = '';
   @State cloudEmail: string = '';
@@ -57,11 +59,36 @@ export struct UsPage {
     promptAction.showToast({ message: '已更新称呼' });
   }
 
-  private addAnniversary(): void {
-    this.appState.addAnniversary(this.annTitle, coerceYmd(this.annDate, todayYmd()), this.annRepeat);
+  private submitAnniversary(): void {
+    if (this.editingAnnId.length > 0) {
+      this.appState.updateAnniversary(
+        this.editingAnnId,
+        this.annTitle,
+        coerceYmd(this.annDate, todayYmd()),
+        this.annRepeat,
+        this.annReminder,
+        ''
+      );
+    } else {
+      this.appState.addAnniversary(this.annTitle, coerceYmd(this.annDate, todayYmd()), this.annRepeat);
+    }
+    this.cancelEditAnniversary();
+  }
+
+  private startEditAnniversary(anniversary: AnniversaryModel): void {
+    this.editingAnnId = anniversary.id;
+    this.annTitle = anniversary.title;
+    this.annDate = ymdOf(anniversary.date);
+    this.annRepeat = anniversary.repeatType;
+    this.annReminder = anniversary.reminderEnabled;
+  }
+
+  private cancelEditAnniversary(): void {
+    this.editingAnnId = '';
     this.annTitle = '';
     this.annDate = todayYmd();
     this.annRepeat = 'yearly';
+    this.annReminder = true;
   }
 
   private async cloudSignIn(): Promise<void> {
@@ -97,11 +124,12 @@ export struct UsPage {
     this.cloudBusy = true;
     this.cloudStatus = '正在拉取…';
     try {
+      const since: string = this.appState.cloud.lastSyncAt;
       const api: MemoryApi = new MemoryApi(this.activeConfig());
-      const remote = await api.listMoments(this.cloudSpaceId.trim());
+      const remote: MomentModel[] = await api.listMoments(this.cloudSpaceId.trim(), since);
       this.appState.mergePulledMoments(remote);
-      this.appState.markSynced();
-      this.cloudStatus = `已拉取 ${remote.length} 条`;
+      this.appState.advanceSyncWatermark(remote);
+      this.cloudStatus = since.length > 0 ? `增量拉取 ${remote.length} 条` : `全量拉取 ${remote.length} 条`;
       promptAction.showToast({ message: '已从云端拉取' });
     } catch (err) {
       const message: string = err instanceof Error ? (err as Error).message : '未知错误';
@@ -112,16 +140,19 @@ export struct UsPage {
   }
 
   private async cloudPush(): Promise<void> {
+    if (this.appState.cloud.coupleSpaceId.length === 0) {
+      this.cloudStatus = '请先填写云端 couple_space_id 并登录后再推送';
+      return;
+    }
     this.cloudBusy = true;
     this.cloudStatus = '正在推送…';
     try {
-      const api: MemoryApi = new MemoryApi(this.activeConfig());
-      const moments = this.appState.visibleMoments();
-      for (let index = 0; index < moments.length; index++) {
-        await api.pushMoment(moments[index]);
-      }
-      this.appState.markSynced();
-      this.cloudStatus = `已推送 ${moments.length} 条`;
+      // 走统一离线队列：先把本地照片上传到 Storage 再推送瞬间，失败的保留待重试。
+      // 不调 markSynced：推送水位不应推进拉取增量 since（避免漏拉对端在推送期间写入的行）。
+      this.appState.markAllUnsyncedPending();
+      await this.appState.syncPending();
+      const pending: number = this.appState.pendingCount();
+      this.cloudStatus = pending === 0 ? '已全部推送到云端' : `仍有 ${pending} 条待重试`;
       promptAction.showToast({ message: '已推送到云端' });
     } catch (err) {
       const message: string = err instanceof Error ? (err as Error).message : '未知错误';
@@ -275,7 +306,7 @@ export struct UsPage {
               });
           }
           .width('100%');
-          Button('添加纪念日')
+          Button(this.editingAnnId.length > 0 ? '保存修改' : '添加纪念日')
             .height(MemoryTheme.size.touchTarget)
             .width('100%')
             .fontSize(MemoryTheme.font.body)
@@ -286,8 +317,22 @@ export struct UsPage {
             .enabled(this.annTitle.trim().length > 0)
             .opacity(this.annTitle.trim().length > 0 ? 1 : 0.5)
             .onClick(() => {
-              this.addAnniversary();
+              this.submitAnniversary();
             });
+
+          if (this.editingAnnId.length > 0) {
+            Button('取消编辑')
+              .height(MemoryTheme.size.touchTarget)
+              .width('100%')
+              .fontSize(MemoryTheme.font.meta)
+              .fontColor(MemoryTheme.colors.muted)
+              .backgroundColor(MemoryTheme.colors.surfaceStrong)
+              .border({ width: 1, color: MemoryTheme.colors.line })
+              .borderRadius(MemoryTheme.radius.card)
+              .onClick(() => {
+                this.cancelEditAnniversary();
+              });
+          }
 
           if (this.appState.anniversaries.length === 0) {
             Text('还没有纪念日。')
@@ -306,6 +351,20 @@ export struct UsPage {
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1);
+                Toggle({ type: ToggleType.Switch, isOn: anniversary.reminderEnabled })
+                  .width(40)
+                  .height(24)
+                  .selectedColor(MemoryTheme.colors.primary)
+                  .onChange((isOn: boolean) => {
+                    this.appState.setAnniversaryReminderEnabled(anniversary.id, isOn);
+                  });
+                Text('编辑')
+                  .fontSize(MemoryTheme.font.caption)
+                  .fontColor(MemoryTheme.colors.primaryDark)
+                  .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                  .onClick(() => {
+                    this.startEditAnniversary(anniversary);
+                  });
                 Text('删除')
                   .fontSize(MemoryTheme.font.caption)
                   .fontColor(MemoryTheme.status.errorInk)
