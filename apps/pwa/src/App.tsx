@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AuthGate } from './features/auth/AuthGate';
 import { MemoryPreview } from './features/brand/MemoryPreview';
 import { CoupleJoin } from './features/couple/CoupleJoin';
+import { Anniversaries } from './features/anniversary/Anniversaries';
 import { MomentComposer } from './features/moments/MomentComposer';
 import { Timeline } from './features/moments/Timeline';
 import { WorkspaceHeader } from './features/shared/WorkspaceHeader';
@@ -36,7 +37,8 @@ export function App() {
                 coupleSpaceId={coupleSpaceId}
                 onCreated={() => setRefreshKey((value) => value + 1)}
               />
-              <Timeline coupleSpaceId={coupleSpaceId} refreshKey={refreshKey} />
+              <Anniversaries coupleSpaceId={coupleSpaceId} />
+              <Timeline coupleSpaceId={coupleSpaceId} refreshKey={refreshKey} currentUserId={session.user.id} />
             </div>
           ) : (
             <CoupleJoin onJoined={enterCoupleSpace} />

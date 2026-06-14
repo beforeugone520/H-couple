@@ -59,7 +59,8 @@ describe('momentService', () => {
       occurredAt: '2026-06-08T11:00:00.000Z',
       createdAt: '2026-06-08T11:01:00.000Z',
       updatedAt: '2026-06-08T11:02:00.000Z',
-      isFavorite: true
+      isFavorite: true,
+      deletedForUserIds: []
     });
   });
 
@@ -77,7 +78,8 @@ describe('momentService', () => {
       occurredAt: '2026-06-08T11:00:00.000Z',
       createdAt: '2026-06-08T11:01:00.000Z',
       updatedAt: '2026-06-08T11:02:00.000Z',
-      isFavorite: false
+      isFavorite: false,
+      deletedForUserIds: []
     });
 
     expect(meta).toEqual({

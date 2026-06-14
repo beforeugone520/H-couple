@@ -14,6 +14,7 @@
 
 - JavaScript/TypeScript 命令默认使用 `pnpm`。
 - PWA 工作目录是 `apps/pwa`。
+- pnpm 10+ 默认不跑依赖构建脚本；`apps/pwa/pnpm-workspace.yaml` 用 `allowBuilds` 放行 `esbuild`，否则 `pnpm test` / `pnpm build` 会因 `ERR_PNPM_IGNORED_BUILDS` 失败。不要删除该放行。
 - PWA 常用验证命令：
 
 ```bash
@@ -38,10 +39,13 @@ pnpm build
 ## HarmonyOS Guidelines
 
 - 保持 ArkTS/ArkUI Stage model 结构，不要把 HarmonyOS 端迁移到 WebView 或跨端壳。
-- 新增页面优先复用 `MemoryTheme`，避免在组件里散落新的颜色、字号和半径。
-- `entry/src/main/module.json5` 中的 `ohos.permission.INTERNET` 是 Supabase 网络访问所需权限，不要删除。
-- 桌面卡片入口是 `entry/src/main/ets/widget/MemoryCardForm.ets`，配置在 `entry/src/main/resources/base/profile/form_config.json`。
-- `MemoryApiConfig` 中的 Supabase URL、anon key、access token 只能从运行时配置或安全存储注入，不能硬编码真实值。
+- 新增页面优先复用 `MemoryTheme`，避免在组件里散落新的颜色、字号和半径。`MemoryTheme` 的现有 token 取值被 `entry/src/ohosTest/ets/test/VisualTheme.test.ets` 断言锁定，只能新增、不要改值。
+- **本地优先架构**：状态中枢是 `shared/state/AppState.ets`（`@Observed`），页面经 `@ObjectLink` 共享同一份实例。`@ObjectLink` 只观察一层属性，**所有变更必须整体替换数组/对象属性**（如 `this.moments = [...]`、克隆后 `this.space = ...`）才能触发刷新；克隆用 `shared/models/MemorySerde.ets` 的 `cloneX`。
+- **持久化**：`shared/services/MemoryRepository.ets` 把整份快照 JSON 存入 `Preferences`（name `memorybox_state`，key `snapshot`）。`AppState` 每次变更后自动写入。新增可序列化字段时，必须同时在 `MemorySerde` 的 `*FromRecord` 映射里读取（ArkTS 名义类型：`JSON.parse` 的普通对象不能直接当 class 用）。
+- **照片**：`shared/services/MemoryPhoto.ets` 用 `PhotoViewPicker` 选图并复制进沙箱 `filesDir/moments/`，存沙箱绝对路径；`Image()` 直接用该绝对路径，**不要加 `file://` 前缀**。
+- `entry/src/main/module.json5` 中的 `ohos.permission.INTERNET` 是 Supabase 网络访问所需权限，不要删除。相册选图与沙箱读写走 picker 临时授权，无需额外权限。
+- 桌面卡片：数据提供方是 `entry/src/main/ets/widget/MemoryCardFormProvider.ets`（`FormExtensionAbility`，读同一份 `Preferences` 快照），卡片 UI 是 `entry/src/main/ets/widget/MemoryCardForm.ets`（`@LocalStorageProp` 绑定，key 必须与 provider 的 `createFormBindingData` 字段一致）。module.json5 的 `extensionAbilities[].srcEntry` 指向 provider，form_config.json 的 `src` 指向卡片 UI。
+- `MemoryApiConfig` 中的 Supabase URL、anon key、access token 只能从运行时配置或安全存储注入，不能硬编码真实值。云同步是可选增强，纯本地模式必须始终可用。
 
 ## PWA Guidelines
 
@@ -49,6 +53,8 @@ pnpm build
 - Auth 使用 Supabase Magic Link；创建/加入空间走 RPC：`create_couple_space` 和 `join_couple_space`。
 - `moments.media_urls` 保存 private Storage path，不保存公开 URL。
 - 显示媒体时通过 `supabase.storage.from('moments').createSignedUrl(...)` 获取短期 signed URL。
+- 时间线已支持珍藏切换（写 `is_favorite`）、对方补一句话（写 `partner_text`，仅非记录者可补）、对自己隐藏（把当前用户追加进 `deleted_for_user_ids`，RLS select 会过滤掉本人已隐藏项）。这些都复用既有列，不改 schema。
+- 纪念日为只读查看（`apps/pwa/src/features/anniversary/`），从 `anniversaries` 表按 `couple_space_id` 读取；新增/编辑纪念日在 HarmonyOS 端。
 - 保留加载、空态、错误、禁用和 pending 状态；不要只实现 happy path。
 
 ## Data And Privacy Rules

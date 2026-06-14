@@ -40,7 +40,8 @@ export function normalizeMoment(row: MomentRow): Moment {
     occurredAt: row.occurred_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    isFavorite: row.is_favorite
+    isFavorite: row.is_favorite,
+    deletedForUserIds: row.deleted_for_user_ids ?? []
   };
 }
 

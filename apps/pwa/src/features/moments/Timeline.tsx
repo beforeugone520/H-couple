@@ -8,6 +8,7 @@ import type { Moment, MomentResponse, MomentRow } from './momentTypes';
 type TimelineProps = {
   coupleSpaceId: string;
   refreshKey: number;
+  currentUserId?: string;
 };
 
 function buildMomentPhotoAlt(meta: ReturnType<typeof getMomentDisplayMeta>) {
@@ -26,7 +27,7 @@ function buildMomentContextLabel(meta: ReturnType<typeof getMomentDisplayMeta>) 
   return `${meta.dateLabel}，${meta.locationLabel}的共同瞬间`;
 }
 
-export function Timeline({ coupleSpaceId, refreshKey }: TimelineProps) {
+export function Timeline({ coupleSpaceId, refreshKey, currentUserId = '' }: TimelineProps) {
   const [moments, setMoments] = useState<Moment[]>([]);
   const [signedUrlByPath, setSignedUrlByPath] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +35,11 @@ export function Timeline({ coupleSpaceId, refreshKey }: TimelineProps) {
   const [hasLoadError, setHasLoadError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [pendingResponseByMomentId, setPendingResponseByMomentId] = useState<Record<string, MomentResponse>>({});
+  const [pendingFavoriteByMomentId, setPendingFavoriteByMomentId] = useState<Record<string, boolean>>({});
+  const [pendingHideByMomentId, setPendingHideByMomentId] = useState<Record<string, boolean>>({});
+  const [editingPartnerId, setEditingPartnerId] = useState('');
+  const [partnerDraft, setPartnerDraft] = useState('');
+  const [pendingPartnerId, setPendingPartnerId] = useState('');
   const respondedCount = moments.filter((moment) => moment.response).length;
   const favoriteCount = moments.filter((moment) => moment.isFavorite).length;
   const latestMomentMeta = moments[0] ? getMomentDisplayMeta(moments[0]) : null;
@@ -138,6 +144,87 @@ export function Timeline({ coupleSpaceId, refreshKey }: TimelineProps) {
     }
   }
 
+  async function toggleFavorite(moment: Moment) {
+    if (pendingFavoriteByMomentId[moment.id]) {
+      return;
+    }
+
+    const nextFavorite = !moment.isFavorite;
+    setPendingFavoriteByMomentId((items) => ({ ...items, [moment.id]: true }));
+
+    try {
+      const { error } = await supabase.from('moments').update({ is_favorite: nextFavorite }).eq('id', moment.id);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+      setMoments((items) =>
+        items.map((item) => (item.id === moment.id ? { ...item, isFavorite: nextFavorite } : item))
+      );
+    } finally {
+      setPendingFavoriteByMomentId((items) => {
+        const { [moment.id]: _done, ...rest } = items;
+        return rest;
+      });
+    }
+  }
+
+  function beginPartnerEdit(moment: Moment) {
+    setEditingPartnerId(moment.id);
+    setPartnerDraft(moment.partnerText);
+  }
+
+  function cancelPartnerEdit() {
+    setEditingPartnerId('');
+    setPartnerDraft('');
+  }
+
+  async function savePartnerText(moment: Moment) {
+    const nextText = partnerDraft.trim();
+    setPendingPartnerId(moment.id);
+
+    try {
+      const { error } = await supabase.from('moments').update({ partner_text: nextText }).eq('id', moment.id);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+      setMoments((items) =>
+        items.map((item) => (item.id === moment.id ? { ...item, partnerText: nextText } : item))
+      );
+      setEditingPartnerId('');
+      setPartnerDraft('');
+    } finally {
+      setPendingPartnerId('');
+    }
+  }
+
+  async function hideMoment(moment: Moment) {
+    if (pendingHideByMomentId[moment.id] || !currentUserId) {
+      return;
+    }
+
+    setPendingHideByMomentId((items) => ({ ...items, [moment.id]: true }));
+
+    try {
+      const nextHidden = Array.from(new Set([...moment.deletedForUserIds, currentUserId]));
+      const { error } = await supabase
+        .from('moments')
+        .update({ deleted_for_user_ids: nextHidden })
+        .eq('id', moment.id);
+      if (error) {
+        setStatus(error.message);
+        return;
+      }
+      setMoments((items) => items.filter((item) => item.id !== moment.id));
+    } finally {
+      setPendingHideByMomentId((items) => {
+        const { [moment.id]: _done, ...rest } = items;
+        return rest;
+      });
+    }
+  }
+
   return (
     <section className="panel timeline-panel" id="timeline-panel">
       <div className="section-heading timeline-heading">
@@ -206,7 +293,18 @@ export function Timeline({ coupleSpaceId, refreshKey }: TimelineProps) {
                           <p className="moment-location">{meta.locationLabel}</p>
                         </div>
                         <div className="moment-badges">
-                          {moment.isFavorite && <span className="favorite-chip">珍藏</span>}
+                          <button
+                            type="button"
+                            className={`favorite-button ${moment.isFavorite ? 'favorite-button-on' : ''}`}
+                            aria-pressed={moment.isFavorite}
+                            aria-label={
+                              moment.isFavorite ? `取消珍藏 ${momentContextLabel}` : `珍藏 ${momentContextLabel}`
+                            }
+                            disabled={Boolean(pendingFavoriteByMomentId[moment.id])}
+                            onClick={() => toggleFavorite(moment)}
+                          >
+                            {moment.isFavorite ? '珍藏' : '收藏'}
+                          </button>
                           <span className={`mood-chip mood-${moment.mood}`}>{meta.moodLabel}</span>
                         </div>
                       </div>
@@ -255,6 +353,51 @@ export function Timeline({ coupleSpaceId, refreshKey }: TimelineProps) {
                           })}
                         </div>
                       </div>
+                      {currentUserId && (
+                        <div className="moment-actions">
+                          {moment.creatorId !== currentUserId &&
+                            (editingPartnerId === moment.id ? (
+                              <div className="partner-editor">
+                                <textarea
+                                  className="partner-input"
+                                  value={partnerDraft}
+                                  onChange={(event) => setPartnerDraft(event.target.value)}
+                                  placeholder="补一句话"
+                                  aria-label={`给${momentContextLabel}补一句话`}
+                                />
+                                <div className="partner-editor-actions">
+                                  <button
+                                    type="button"
+                                    className="primary-action"
+                                    disabled={pendingPartnerId === moment.id}
+                                    onClick={() => savePartnerText(moment)}
+                                  >
+                                    {pendingPartnerId === moment.id ? '保存中...' : '保存'}
+                                  </button>
+                                  <button type="button" className="secondary-action" onClick={cancelPartnerEdit}>
+                                    取消
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="secondary-action"
+                                onClick={() => beginPartnerEdit(moment)}
+                              >
+                                {moment.partnerText ? '修改我的一句话' : '补一句话'}
+                              </button>
+                            ))}
+                          <button
+                            type="button"
+                            className="hide-action"
+                            disabled={Boolean(pendingHideByMomentId[moment.id])}
+                            onClick={() => hideMoment(moment)}
+                          >
+                            {pendingHideByMomentId[moment.id] ? '隐藏中...' : '对我隐藏'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </article>
                 </Fragment>

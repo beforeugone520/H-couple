@@ -75,8 +75,10 @@ interface ThemeFont {
   caption: number;
   meta: number;
   body: number;
+  subtitle: number;
   title: number;
   display: number;
+  hero: number;
 }
 
 interface ThemeTokens {
@@ -184,7 +186,9 @@ export const MemoryTheme: ThemeTokens = {
     caption: 12,
     meta: 13,
     body: 15,
+    subtitle: 18,
     title: 22,
-    display: 34
+    display: 34,
+    hero: 48
   }
 };

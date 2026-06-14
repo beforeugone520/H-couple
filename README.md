@@ -6,14 +6,14 @@
 
 ## 当前状态
 
-- HarmonyOS 端：ArkTS/ArkUI 工程位于仓库根目录，入口模块是 `entry`；已包含四个主入口「今天 / 时间线 / 相册 / 我们」、记录表单雏形、Supabase REST 读取模型和桌面卡片雏形。
-- PWA 端：React + Vite 项目位于 `apps/pwa`；已覆盖邮箱 Magic Link 登录、创建/加入双人空间、上传照片、创建瞬间、读取时间线和轻回应。
+- HarmonyOS 端：ArkTS/ArkUI 工程位于仓库根目录，入口模块是 `entry`，**本地优先（local-first）即开即用**。首次进入引导建立双人空间（两个称呼 + 在一起的日子，自动生成邀请码）；四个主入口「今天 / 时间线 / 相册 / 我们」全部绑定真实数据并持久化到设备 `Preferences`：今天页显示在一起天数 / 最近一条 / 某年今日 / 下一个纪念日倒数；记录支持相册选图（落地沙箱）、文字、心情、地点；时间线支持筛选（我的 / 对方 / 收藏 / 有地点）、珍藏、轻回应、对方补一句话、对自己隐藏；相册按月份 / 地点 / 纪念日聚合；我们页管理称呼、邀请码复制、纪念日增删与可选云同步。桌面卡片由 `FormExtensionAbility` 读取同一份本地快照显示最近回忆与纪念日倒数。可选的 Supabase REST 云同步用于跨设备。
+- PWA 端：React + Vite 项目位于 `apps/pwa`；已覆盖邮箱 Magic Link 登录、创建/加入双人空间、上传照片、创建瞬间、读取时间线、轻回应、珍藏切换、对方补一句话、对自己隐藏，以及只读的纪念日查看。
 - 后端：Supabase SQL schema 位于 `docs/api/supabase-schema.sql`；Storage bucket 策略说明位于 `docs/api/storage-policies.md`。
 - 设计/规划：产品规格和历史实施计划位于 `docs/superpowers/`；视觉系统位于 `design-system/twoperson-memory-box/MASTER.md`。
 
 ## 技术栈
 
-- HarmonyOS 6.1.0(23), ArkTS, ArkUI, Stage model, Form extension
+- HarmonyOS 6.1.0(23), ArkTS, ArkUI, Stage model, ArkData Preferences（本地持久化）, CoreFileKit（照片落地沙箱）, MediaLibraryKit（相册选图）, Form extension
 - React 18, TypeScript, Vite, Vitest
 - Supabase Auth, PostgreSQL RLS, Storage
 - pnpm for JavaScript package management
@@ -26,10 +26,14 @@
 ├── entry/                            # HarmonyOS entry 模块
 │   └── src/main/ets/
 │       ├── entryability/             # Stage Ability
-│       ├── features/                 # Today / Timeline / Album / Us / Composer
-│       ├── pages/                    # Index 页面
-│       ├── shared/                   # 模型、API、状态、主题
-│       └── widget/                   # 桌面卡片
+│       ├── features/                 # setup / today / timeline / album / us / moments(Composer)
+│       ├── pages/                    # Index 应用外壳（引导 / 顶栏 / 四个 Tab）
+│       ├── shared/                   # models / serde / services / state / util / theme
+│       │   ├── models/               # 数据模型 + 序列化映射(MemorySerde)
+│       │   ├── services/             # MemoryRepository(本地持久化) / MemoryPhoto(选图) / MemoryApi(可选云同步)
+│       │   ├── state/                # AppState（@Observed 中枢状态）
+│       │   └── util/                 # MemoryUtil（日期/ID/JSON 安全读取/文案）
+│       └── widget/                   # MemoryCardFormProvider(数据) + MemoryCardForm(卡片 UI)
 ├── apps/pwa/                         # iPhone/PWA 验证端
 ├── docs/api/                         # Supabase schema 和 Storage policy
 ├── docs/superpowers/                 # 产品规格和历史实施计划
@@ -59,6 +63,8 @@ cd apps/pwa
 pnpm install
 ```
 
+> pnpm 10+ 默认不执行依赖的构建脚本。`apps/pwa/pnpm-workspace.yaml` 已通过 `allowBuilds` 放行 `esbuild`，使 `pnpm test` / `pnpm build` 可非交互运行。
+
 创建 `apps/pwa/.env.local`：
 
 ```env
@@ -87,7 +93,13 @@ pnpm preview
 4. 首次真机运行或构建 HAP 时，按 DevEco Studio 提示配置本机调试签名。
 5. 使用模拟器或真机运行，或通过 Build 菜单构建 HAP。
 
-HarmonyOS 端当前还没有完整登录和写入链路，`MemoryApi` 只保留了通过 Supabase REST 按 `couple_space_id` 读取 `moments` 的骨架。后续接入真实账号时需要把 Supabase URL、anon key 和用户 access token 注入 `MemoryApiConfig`，不要把密钥硬编码进源码。
+### 数据与同步模式
+
+HarmonyOS 端是**本地优先**的：所有数据（双人空间、成员、瞬间、纪念日、云配置）以 JSON 快照存进应用 `Preferences`（名称 `memorybox_state`，键 `snapshot`），无需任何后端即可完整使用。照片通过相册选择后复制进应用沙箱 `filesDir/moments/`，时间线与相册直接用沙箱绝对路径渲染。
+
+云同步为**可选增强**：在「我们」页填写 Supabase URL、anon key、登录邮箱/密码和云端 `couple_space_id` 后，可登录并拉取/推送瞬间，实现跨设备同步。Supabase URL、anon key、access token 只在运行时注入并存入本地配置，**不在源码中硬编码真实值**（见 `MemoryApiConfig` 与 AGENTS.md）。云同步当前同步瞬间的文本类字段，照片仍保存在本地设备。
+
+桌面卡片由 `entry/src/main/ets/widget/MemoryCardFormProvider.ets`（`FormExtensionAbility`）读取同一份本地快照，绑定到 `MemoryCardForm.ets` 卡片 UI 显示在一起天数、最近一条瞬间和下一个纪念日倒数。
 
 ## 测试与验证
 
@@ -99,11 +111,17 @@ pnpm test
 pnpm build
 ```
 
+> 本机若无 HarmonyOS 工具链（DevEco Studio / hvigor / SDK），无法在本机编译；HarmonyOS 端的验证需在装有 DevEco Studio 的环境进行。
+
 HarmonyOS 验证以 DevEco Studio 编译和真机/模拟器预览为准。重点检查：
 
+- 首次进入能创建空间，重启后数据仍在（`Preferences` 持久化）。
+- 记录瞬间（照片 + 文字 + 心情 + 地点）保存后出现在「今天」和「时间线」。
+- 时间线筛选、珍藏、轻回应、对方补一句话、对自己隐藏都生效且持久化。
+- 顶栏「记录身份」切换后，「我的 / 对方记录的」筛选与补一句话入口随之变化。
 - 四个主 tab 在手机、平板和 2in1 目标上不重叠。
 - 空状态、加载失败状态和有数据状态都可读。
-- 桌面卡片文本不裁切。
+- 桌面卡片文本不裁切，能反映最近一条瞬间与纪念日倒数。
 - 网络权限 `ohos.permission.INTERNET` 保留在 `entry/src/main/module.json5`。
 
 Supabase 权限需要用多个账号手工验证：
