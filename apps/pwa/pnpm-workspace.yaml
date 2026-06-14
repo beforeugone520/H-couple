@@ -1,0 +1,6 @@
+# pnpm 10+ no longer auto-runs dependency build scripts. esbuild (pulled in by
+# vite) ships its platform binary via an optional @esbuild/* package, so it works
+# without a postinstall — but pnpm still gates `pnpm test` / `pnpm build` on an
+# explicit allowlist. Allowing it here lets those commands run non-interactively.
+allowBuilds:
+  esbuild: true

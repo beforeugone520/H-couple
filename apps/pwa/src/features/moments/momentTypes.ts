@@ -15,6 +15,7 @@ export type Moment = {
   createdAt: string;
   updatedAt: string;
   isFavorite: boolean;
+  deletedForUserIds: string[];
 };
 
 export type MomentRow = {
@@ -31,6 +32,7 @@ export type MomentRow = {
   created_at: string;
   updated_at: string;
   is_favorite: boolean;
+  deleted_for_user_ids?: string[];
 };
 
 export type NewMomentInput = {
@@ -41,4 +43,26 @@ export type NewMomentInput = {
   mood: Mood;
   locationName: string;
   occurredAt: string;
+};
+
+export type RepeatType = 'none' | 'yearly';
+
+export type Anniversary = {
+  id: string;
+  coupleSpaceId: string;
+  title: string;
+  date: string;
+  repeatType: RepeatType;
+  reminderEnabled: boolean;
+  coverMediaUrl: string;
+};
+
+export type AnniversaryRow = {
+  id: string;
+  couple_space_id: string;
+  title: string;
+  date: string;
+  repeat_type: RepeatType;
+  reminder_enabled: boolean;
+  cover_media_url: string | null;
 };

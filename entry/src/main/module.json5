@@ -37,7 +37,7 @@
     "extensionAbilities": [
       {
         "name": "MemoryCardForm",
-        "srcEntry": "./ets/widget/MemoryCardForm.ets",
+        "srcEntry": "./ets/widget/MemoryCardFormProvider.ets",
         "description": "双人时光盒桌面卡片",
         "type": "form",
         "metadata": [

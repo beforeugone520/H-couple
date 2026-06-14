@@ -33,14 +33,17 @@
 
 ### Typography
 
-- **Heading Font:** Lora
-- **Body Font:** Raleway
-- **Mood:** calm, wellness, health, relaxing, natural, organic
-- **Google Fonts:** [Lora + Raleway](https://fonts.google.com/share?selection.family=Lora:wght@400;500;600;700|Raleway:wght@300;400;500;600;700)
+- **Heading / Display Font:** Fraunces（柔性光学衬线，承载品牌、标题与大号数字；`font-optical-sizing: auto`，`SOFT` 轴营造温柔感）
+- **Body Font:** Manrope（暖几何无衬线，正文与控件）
+- **Chinese fallback:** PingFang SC / HarmonyOS Sans SC / Songti SC（衬线场景）/ Microsoft YaHei / system-ui
+- **Mood:** quiet, intimate, editorial, warm, soft
+- **Google Fonts:** Fraunces + Manrope
 
-**CSS Import:**
+PWA 通过 CSS 变量统一：`--font-display`（Fraunces…）/ `--font-body`（Manrope…）。HarmonyOS 端中文为主，字体由 `MemoryTheme.font` 字号尺度承载（`hero` 48 用于「在一起 N 天」）。
+
+**CSS Import（PWA，已在 `apps/pwa/index.html` 通过 `<link>` 引入）:**
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=Manrope:wght@400..800&display=swap');
 ```
 
 ### Spacing Variables

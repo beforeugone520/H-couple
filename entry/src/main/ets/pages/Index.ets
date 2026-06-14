@@ -1,186 +1,138 @@
+import { common } from '@kit.AbilityKit';
 import { AlbumPage } from '../features/album/AlbumPage';
 import { TodayPage } from '../features/today/TodayPage';
 import { TimelinePage } from '../features/timeline/TimelinePage';
 import { UsPage } from '../features/us/UsPage';
+import { SetupPage } from '../features/setup/SetupPage';
 import { AppState } from '../shared/state/AppState';
+import { MemberModel } from '../shared/models/MemoryModels';
 import { MemoryTheme } from '../shared/theme/MemoryTheme';
 
 @Entry
 @Component
 struct Index {
   @State appState: AppState = new AppState();
+  @State tabIndex: number = 0;
+
+  aboutToAppear(): void {
+    this.appState.init(getContext(this) as common.Context);
+  }
+
+  @Builder
+  identitySwitch() {
+    Row({ space: MemoryTheme.space.xs }) {
+      Text('记录身份')
+        .fontSize(MemoryTheme.font.caption)
+        .fontColor(MemoryTheme.colors.muted);
+
+      ForEach(this.appState.space.members, (member: MemberModel) => {
+        Text(member.displayName)
+          .fontSize(MemoryTheme.font.caption)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(member.id === this.appState.activeMemberId
+            ? MemoryTheme.colors.surfaceStrong
+            : MemoryTheme.colors.primaryDark)
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor(member.id === this.appState.activeMemberId
+            ? MemoryTheme.colors.primary
+            : MemoryTheme.colors.roseSoft)
+          .borderRadius(MemoryTheme.radius.pill)
+          .onClick(() => {
+            this.appState.setActiveMember(member.id);
+          });
+      }, (member: MemberModel) => member.id);
+    }
+  }
+
+  @Builder
+  topBar() {
+    Column({ space: MemoryTheme.space.sm }) {
+      Row() {
+        Column({ space: 2 }) {
+          Text('双人时光盒')
+            .fontSize(MemoryTheme.font.title)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(MemoryTheme.colors.ink);
+
+          Text(this.appState.togetherDays() > 0
+            ? `在一起第 ${this.appState.togetherDays()} 天`
+            : '把今天收进时光盒')
+            .fontSize(MemoryTheme.font.caption)
+            .fontColor(MemoryTheme.colors.muted);
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1);
+
+        Text(this.appState.space.inviteCode.length > 0 ? `邀请码 ${this.appState.space.inviteCode}` : '私密空间')
+          .fontSize(MemoryTheme.font.caption)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(MemoryTheme.colors.sage)
+          .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+          .backgroundColor(MemoryTheme.colors.sageSoft)
+          .borderRadius(MemoryTheme.radius.pill);
+      }
+      .width('100%');
+
+      this.identitySwitch();
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .padding({
+      left: MemoryTheme.space.lg,
+      right: MemoryTheme.space.lg,
+      top: MemoryTheme.space.md,
+      bottom: MemoryTheme.space.sm
+    });
+  }
 
   build() {
     Column() {
-      Column({ space: MemoryTheme.space.md }) {
-        Text('只属于两个人')
-          .fontSize(MemoryTheme.font.caption)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(MemoryTheme.colors.primary);
-
-        Text('双人时光盒')
-          .fontSize(MemoryTheme.font.display)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(MemoryTheme.colors.ink);
-
-        Text('把照片、一句话和轻回应收进同一个私密空间。')
-          .fontSize(MemoryTheme.font.body)
-          .fontColor(MemoryTheme.colors.muted);
-
-        Row({ space: MemoryTheme.space.sm }) {
-          Text('共同记录')
-            .fontSize(MemoryTheme.font.meta)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.primaryDark)
-            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .borderRadius(MemoryTheme.radius.pill);
-
-          Text('轻量回应')
-            .fontSize(MemoryTheme.font.meta)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.primaryDark)
-            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .borderRadius(MemoryTheme.radius.pill);
-
-          Text('私密同步')
-            .fontSize(MemoryTheme.font.meta)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.primaryDark)
-            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .borderRadius(MemoryTheme.radius.pill);
+      if (!this.appState.ready) {
+        Column() {
+          LoadingProgress()
+            .width(48)
+            .height(48)
+            .color(MemoryTheme.colors.primary);
+          Text('正在打开时光盒…')
+            .fontSize(MemoryTheme.font.body)
+            .fontColor(MemoryTheme.colors.muted)
+            .margin({ top: MemoryTheme.space.md });
         }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(MemoryTheme.colors.background);
+      } else if (!this.appState.isSetup()) {
+        SetupPage({ appState: this.appState });
+      } else {
+        this.topBar();
 
-        Row({ space: MemoryTheme.space.sm }) {
-          Text('身份确认')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.ink)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .border({ width: 1, color: MemoryTheme.colors.line })
-            .borderRadius(MemoryTheme.radius.card);
+        Tabs({ barPosition: BarPosition.End, index: this.tabIndex }) {
+          TabContent() {
+            TodayPage({ appState: this.appState });
+          }.tabBar('今天');
 
-          Text('今日新记录')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.ink)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .border({ width: 1, color: MemoryTheme.colors.line })
-            .borderRadius(MemoryTheme.radius.card);
+          TabContent() {
+            TimelinePage({ appState: this.appState });
+          }.tabBar('时间线');
 
-          Text('等待回应')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.ink)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .border({ width: 1, color: MemoryTheme.colors.line })
-            .borderRadius(MemoryTheme.radius.card);
+          TabContent() {
+            AlbumPage({ appState: this.appState });
+          }.tabBar('相册');
 
-          Text('双端同步')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.ink)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.surfaceStrong)
-            .border({ width: 1, color: MemoryTheme.colors.line })
-            .borderRadius(MemoryTheme.radius.card);
+          TabContent() {
+            UsPage({ appState: this.appState });
+          }.tabBar('我们');
         }
-
-        Column({ space: MemoryTheme.space.sm }) {
-          Text('登录下一步')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.status.successInk);
-
-          Flex({ wrap: FlexWrap.Wrap }) {
-            Text('1 检查邮箱')
-              .fontSize(MemoryTheme.font.caption)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(MemoryTheme.status.successInk)
-              .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-              .backgroundColor(MemoryTheme.status.successBg)
-              .border({ width: 1, color: MemoryTheme.colors.line })
-              .borderRadius(MemoryTheme.radius.card)
-              .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm });
-
-            Text('2 点击登录链接')
-              .fontSize(MemoryTheme.font.caption)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(MemoryTheme.status.successInk)
-              .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-              .backgroundColor(MemoryTheme.status.successBg)
-              .border({ width: 1, color: MemoryTheme.colors.line })
-              .borderRadius(MemoryTheme.radius.card)
-              .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm });
-
-            Text('3 回到时光盒')
-              .fontSize(MemoryTheme.font.caption)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(MemoryTheme.status.successInk)
-              .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-              .backgroundColor(MemoryTheme.status.successBg)
-              .border({ width: 1, color: MemoryTheme.colors.line })
-              .borderRadius(MemoryTheme.radius.card)
-              .margin({ right: MemoryTheme.space.sm, bottom: MemoryTheme.space.sm });
-          }
-        }
-        .alignItems(HorizontalAlign.Start)
-        .padding({ left: 12, right: 12, top: 10 })
-        .backgroundColor(MemoryTheme.colors.surfaceStrong)
-        .border({ width: 1, color: MemoryTheme.colors.line })
-        .borderRadius(MemoryTheme.radius.card)
-        .width('100%');
-
-        Row({ space: MemoryTheme.space.sm }) {
-          Text('主操作：今天记录')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.surfaceStrong)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.primary)
-            .borderRadius(MemoryTheme.radius.card);
-
-          Text('下一步：时间线回看')
-            .fontSize(MemoryTheme.font.caption)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(MemoryTheme.colors.sage)
-            .padding({ left: 10, right: 10, top: 7, bottom: 7 })
-            .backgroundColor(MemoryTheme.colors.sageSoft)
-            .border({ width: 1, color: MemoryTheme.colors.line })
-            .borderRadius(MemoryTheme.radius.card);
-        }
+        .layoutWeight(1)
+        .barMode(BarMode.Fixed)
+        .onChange((index: number) => {
+          this.tabIndex = index;
+        });
       }
-      .alignItems(HorizontalAlign.Start)
-      .width('100%')
-      .margin({ top: 22, bottom: 22 });
-
-      Tabs({ barPosition: BarPosition.End }) {
-        TabContent() {
-          TodayPage({ moments: this.appState.moments });
-        }.tabBar('今天');
-
-        TabContent() {
-          TimelinePage({ moments: this.appState.moments });
-        }.tabBar('时间线');
-
-        TabContent() {
-          AlbumPage({ moments: this.appState.moments });
-        }.tabBar('相册');
-
-        TabContent() {
-          UsPage({ coupleSpaceId: this.appState.coupleSpaceId });
-        }.tabBar('我们');
-      }
-      .layoutWeight(1);
     }
     .width('100%')
     .height('100%')
-    .padding({ left: MemoryTheme.space.lg, right: MemoryTheme.space.lg })
     .backgroundColor(MemoryTheme.colors.background);
   }
 }
