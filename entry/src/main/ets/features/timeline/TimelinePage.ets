@@ -266,7 +266,6 @@ export struct TimelinePage {
   }
 
   build() {
-    const list: MomentModel[] = this.appState.filteredMoments(this.filter);
     Column({ space: MemoryTheme.space.md }) {
       Flex({ wrap: FlexWrap.Wrap }) {
         this.filterChip('all', '全部');
@@ -305,14 +304,14 @@ export struct TimelinePage {
       }
       .width('100%');
 
-      if (list.length === 0) {
+      if (this.appState.filteredMoments(this.filter).length === 0) {
         this.emptyState();
       } else {
         List({ space: MemoryTheme.space.md }) {
-          ForEach(list, (moment: MomentModel, index: number) => {
+          ForEach(this.appState.filteredMoments(this.filter), (moment: MomentModel, index: number) => {
             ListItem() {
               Column({ space: MemoryTheme.space.sm }) {
-                if (this.showMonthDivider(list, index)) {
+                if (this.showMonthDivider(this.appState.filteredMoments(this.filter), index)) {
                   Text(monthLabelOf(moment.occurredAt))
                     .fontSize(MemoryTheme.font.caption)
                     .fontWeight(FontWeight.Bold)
